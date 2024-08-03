@@ -20,15 +20,19 @@ using NinjaTrader.NinjaScript;
 using NinjaTrader.Core.FloatingPoint;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.DrawingTools;
+using System.Net.Http;
+using System.Threading.Tasks;
+using System.Xml.Linq;
 
 using System.Globalization;
+using NinjaTrader.NinjaScript.MarketAnalyzerColumns;
 #endregion
 
 //This namespace holds Strategies in this folder and is required. Do not change it. 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	public class StandardDeev : Strategy
-	{
+    public class StandardDeev : Strategy
+    {
         private double entry_price;
         private double stopLossPrice = 0.0;
         private double sl_price = 0.0;
@@ -90,8 +94,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         // News
         private DateTime lastNewsUpdate = DateTime.MinValue;
         private string lastLoadError;
-        public bool Debug =false;
+        public bool Debug = false;
         private CultureInfo ffDateTimeCulture = CultureInfo.CreateSpecificCulture("en-US");
+
+        public bool bad_news_day = false;
 
         HashSet<string> dates = new HashSet<string>
         {
@@ -169,46 +175,47 @@ namespace NinjaTrader.NinjaScript.Strategies
             "2024-06-21",
             "2024-06-25",
             "2024-06-26",
-               
+
             "2024-07-02", // July dates
             "2024-07-11",
             "2024-07-25"
         };
 
         protected override void OnStateChange()
-		{
-			if (State == State.SetDefaults)
-			{
-				Description									= @"Enter the description for your new custom Strategy here.";
-				Name										= "StandardDeev";
-				Calculate									= Calculate.OnBarClose;
-				EntriesPerDirection							= 1;
-				EntryHandling								= EntryHandling.AllEntries;
-				IsExitOnSessionCloseStrategy				= true;
-				ExitOnSessionCloseSeconds					= 30;
-				IsFillLimitOnTouch							= false;
-				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
-				OrderFillResolution							= OrderFillResolution.Standard;
-				Slippage									= 0;
-				StartBehavior								= StartBehavior.WaitUntilFlat;
-				TimeInForce									= TimeInForce.Gtc;
-				TraceOrders									= false;
-				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelClose;
-				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
-				BarsRequiredToTrade							= 20;
-				// Disable this property for performance gains in Strategy Analyzer optimizations
-				// See the Help Guide for additional information
-				IsInstantiatedOnEachOptimizationIteration	= true;
+        {
+            if (State == State.SetDefaults)
+            {
+                Description = @"Enter the description for your new custom Strategy here.";
+                Name = "StandardDeev";
+                Calculate = Calculate.OnBarClose;
+                EntriesPerDirection = 1;
+                EntryHandling = EntryHandling.AllEntries;
+                IsExitOnSessionCloseStrategy = true;
+                ExitOnSessionCloseSeconds = 30;
+                IsFillLimitOnTouch = false;
+                MaximumBarsLookBack = MaximumBarsLookBack.TwoHundredFiftySix;
+                OrderFillResolution = OrderFillResolution.Standard;
+                Slippage = 0;
+                StartBehavior = StartBehavior.WaitUntilFlat;
+                TimeInForce = TimeInForce.Gtc;
+                TraceOrders = false;
+                RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
+                StopTargetHandling = StopTargetHandling.PerEntryExecution;
+                BarsRequiredToTrade = 20;
+                // Disable this property for performance gains in Strategy Analyzer optimizations
+                // See the Help Guide for additional information
+                IsInstantiatedOnEachOptimizationIteration = true;
 
                 // Default Times
                 StartTime = 50000;
                 EndTime = 110000;
 
                 Debug = false;
+
             }
-			else if (State == State.Configure)
-			{
-			}
+            else if (State == State.Configure)
+            {
+            }
             if (State == State.Historical)
             {
                 // Instantiate mySessionIterator once in State.Configure
@@ -216,8 +223,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-		protected override void OnBarUpdate()
-		{
+        protected override void OnBarUpdate()
+        {
+
             if (Bars.IsFirstBarOfSession)
             {
                 // use the current bar time to calculate the next session
@@ -234,6 +242,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             //LoadNews();
+            CheckNews();
 
             CheckLevels();
 
@@ -379,6 +388,52 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }*/
 
+        public async Task CheckNews()
+        {
+            DateTime tradingDate = Time[0].Date;
+            string formattedDate = tradingDate.ToString("MM-dd-yyyy");
+
+            //AVOID CPI DAYS & core retail sales & Prelim UoM Consumer Sentiment & Unemployment Claims
+            NinjaTrader.Code.Output.Process("Check the news (" + formattedDate.ToString() + ")", PrintTo.OutputTab2);
+            string url = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml";
+
+            using (HttpClient client = new HttpClient())
+            {
+                // Download the XML
+                string xmlContent = await client.GetStringAsync(url);
+
+                // Load the XML into an XDocument
+                XDocument doc = XDocument.Parse(xmlContent);
+
+                // Parse the XML and pull out the elements
+                var events = doc.Descendants("event")
+                                .Select(e => new
+                                {
+                                    Title = e.Element("title")?.Value,
+                                    Country = e.Element("country")?.Value,
+                                    Date = e.Element("date")?.Value
+                                });
+
+                // Output the results
+                foreach (var ev in events)
+                {
+                    //Console.WriteLine($"Title: {ev.Title}, Country: {ev.Country}, Date: {ev.Date}");
+                    if (ev.Country == "USD" && ev.Date == formattedDate)
+                    {
+                        NinjaTrader.Code.Output.Process($"Title: {ev.Title}, Country: {ev.Country}, Date: {ev.Date}", PrintTo.OutputTab2);
+                        if (ev.Title.Contains("CPI ") || ev.Title.Contains("core retail") || ev.Title.Contains("Fed Chair ") ||
+                            ev.Title.Contains("Prelim UoM Consumer Sentiment")
+                            || ev.Title.Contains("Unemployment Claims"))
+                        {
+                            NinjaTrader.Code.Output.Process("Don't Trade Today! (" + formattedDate.ToString() + ")", PrintTo.OutputTab2);
+                            bad_news_day = true;
+                        }
+                    }
+                }
+            }
+
+        }
+
         public void CheckLevels()
         {
             // Support/Resistance
@@ -429,7 +484,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         public void VwapCheck()
         {
-            VWAP vwiz = VWAP();
+            VWAPx vwiz = VWAPx();
             vwiz.NumDeviations = 3;
             vwiz.SD1 = 1;
             vwiz.SD2 = 2.01;
@@ -461,16 +516,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         public void getYourTradeOn()
         {
-            
+
             if (Position.MarketPosition != MarketPosition.Flat)
                 return;
 
             // Check Time 
             if (!(ToTime(Time[0]) >= StartTime && ToTime(Time[0]) <= EndTime))
                 return;
-            
+
             // *** AVOID CPI DAYS & core retail sales & Prelim UoM Consumer Sentiment & Unemployment Claims ***
-            if (dates.Contains(currentDate))
+            if (dates.Contains(currentDate) || bad_news_day)
             {
                 return;
             }
@@ -509,7 +564,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     && (Close[0] > vwap_value && Open[0] > vwap_value))
                 )
             {
-                vwap_long = true;
+
                 NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
@@ -520,9 +575,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 NinjaTrader.Code.Output.Process("std_deviation_short_value1: " + std_deviation_short_value1.ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("std_deviation_long_value2: " + std_deviation_long_value2.ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("std_deviation_short_value2: " + std_deviation_short_value2.ToString(), PrintTo.OutputTab2);
-                
-                
-                EnterLong(10, "VWAP Cross Long");
+
+
+                EnterLong(4, "VWAP Cross Long");
+                vwap_long = true;
+
                 //EnterLongStopLimit(std_deviation_long_value1, std_deviation_short_value2);
                 //stopLossPrice = Position.AveragePrice - 10 * TickSize;
                 //sl_price = std_deviation_short_value2 - 20;
@@ -538,9 +595,52 @@ namespace NinjaTrader.NinjaScript.Strategies
                 entry_price = GetCurrentBid();
                 //SetStopLoss(CalculationMode.Price, Close[0] + 20);
                 //SetProfitTarget(CalculationMode.Price, std_deviation_long_value2);
-                
+
                 NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
             }
+
+            // Std. Dev1 to std. dev2
+            if (Close[0] > EMA(55)[0]
+                && TEMA(21)[0] > SMA(21)[0]
+                && std_deviation_long_value1 > EMA(55)[0]
+                && ((Close[1] < std_deviation_long_value1 || Open[1] < std_deviation_long_value1)
+                    && (Close[0] > std_deviation_long_value1 && Open[0] > std_deviation_long_value1))
+                )
+            {
+
+                NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Open: " + Open[0].ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("std_deviation_short_value1: " + std_deviation_short_value1.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("std_deviation_long_value2: " + std_deviation_long_value2.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("std_deviation_short_value2: " + std_deviation_short_value2.ToString(), PrintTo.OutputTab2);
+
+
+                //EnterLong(4, "Std1 Cross Long");
+                //std_dev_long_1 = true;
+                //EnterLongStopLimit(std_deviation_long_value1, std_deviation_short_value2);
+                //stopLossPrice = Position.AveragePrice - 10 * TickSize;
+                //sl_price = std_deviation_short_value2 - 20;
+                //SetStopLoss(CalculationMode.Price, sl_price);
+                double profit_target = std_deviation_long_value1;
+                //ExitLongLimit(resTop1, "VWAP Cross Long");
+
+                /*if (resTop1 < std_deviation_long_value1)
+                    SetProfitTarget(CalculationMode.Price, resTop1);
+                else
+                    SetProfitTarget(CalculationMode.Price, std_deviation_long_value1);*/
+
+                entry_price = GetCurrentBid();
+                //SetStopLoss(CalculationMode.Price, Close[0] + 20);
+                //SetProfitTarget(CalculationMode.Price, std_deviation_long_value2);
+
+                NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
+            }
+
 
             // Shorts 
             if (Close[0] < EMA(55)[0]
@@ -590,7 +690,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (Position.MarketPosition == MarketPosition.Long)
             {
-                NinjaTrader.Code.Output.Process("SELL SELL SELL", PrintTo.OutputTab2);
+                /*NinjaTrader.Code.Output.Process("SELL SELL SELL", PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
@@ -610,48 +710,75 @@ namespace NinjaTrader.NinjaScript.Strategies
                 NinjaTrader.Code.Output.Process("resBotton2: " + resBotton2.ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("resBotton3: " + resBotton3.ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("END SELL\n\n", PrintTo.OutputTab2);
+                */
 
 
-                // Safe guards longs
-                // If we made 8 ticks 
-                if (Close[0] > entry_price + 5)
+                if (vwap_long)
                 {
-                    ExitLong("VWAP Cross Long");
-                    vwap_long = false;
-                    vwap_short = false;
+                    // Safe guards longs
+                    // If we made 8 ticks 
+                    if (Close[0] > entry_price + 5)
+                    {
+                        ExitLong("VWAP Cross Long");
+                        vwap_long = false;
+                        std_dev_long_1 = false;
+                        vwap_short = false;
+                    }
+
+                    // If we went under 29 ticks
+                    if (Close[0] < entry_price - 28)
+                    {
+                        ExitLong("VWAP Cross Long");
+                        vwap_long = false;
+                        std_dev_long_1 = false;
+                        vwap_short = false;
+                    }
+
+                    // If PA is below the 1st std dev. and PA hits a combined resistance
+                    if (Close[0] < std_deviation_long_value1
+                        && (resTop3 == resTop2)
+                        && (Close[0] >= resBotton1)
+                        && ((resBotton1 - entry_price) > 4)
+                        )
+                    {
+                        ExitLong("VWAP Cross Long");
+                        vwap_long = false;
+                        std_dev_long_1 = false;
+                        vwap_short = false;
+                    }
+
+                    // If we close over the 1st deviation
+                    if (Close[0] >= std_deviation_long_value1
+                        && ((std_deviation_long_value1 - entry_price) > 2)
+                        )
+                    {
+                        ExitLong("VWAP Cross Long");
+                        vwap_long = false;
+                        std_dev_long_1 = false;
+                        vwap_short = false;
+                    }
                 }
 
-                // If we went under 29 ticks
-                if (Close[0] < entry_price - 28)
+                if (std_dev_long_1)
                 {
-                    ExitLong("VWAP Cross Long");
-                    vwap_long = false;
-                    vwap_short = false;
+                    if (Close[0] > entry_price + 1)
+                    {
+                        ExitLong("Std1 Cross Long");
+                        vwap_long = false;
+                        std_dev_long_1 = false;
+                        vwap_short = false;
+                    }
+
+                    // If we went under X# ticks
+                    /*if (Close[0] < entry_price - 30)
+                    {
+                        ExitLong("Std1 Cross Long");
+                        vwap_long = false;
+                        std_dev_long_1 = false;
+                        vwap_short = false;
+                    }*/
                 }
 
-                // If PA is below the 1st std dev. and PA hits a combined resistance
-                if (Close[0] < std_deviation_long_value1
-                    && (resTop3 == resTop2)
-                    && (Close[0] >= resBotton1)
-                    && ((resBotton1 - entry_price) > 4)
-                    )
-                {
-                    ExitLong("VWAP Cross Long");
-                    vwap_long = false;
-                    vwap_short = false;
-                }
-
-                // If we close over the 1st deviation
-                if (Close[0] >= std_deviation_long_value1
-                    && ((std_deviation_long_value1 - entry_price) > 2)
-                    )
-                {
-                    ExitLong("VWAP Cross Long");
-                    vwap_long = false;
-                    vwap_short = false;
-                }
-
-                
 
                 //if (Close[0] < entry_price - 20)
                 //    ExitLong("VWAP Cross Long");
@@ -727,9 +854,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Safe guards longs
                 // If we made 8 ticks 
                 if (Close[0] < entry_price - 2)
-                { 
+                {
                     ExitShort("VWAP Cross Short");
                     vwap_long = false;
+                    std_dev_long_1 = false;
                     vwap_short = false;
                 }
 
@@ -737,6 +865,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     ExitShort("VWAP Cross Short");
                     vwap_long = false;
+                    std_dev_long_1 = false;
                     vwap_short = false;
                 }
 
