@@ -412,12 +412,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             return false;
         }
 
-        public async Task<bool> SomeMethod()
-        {
-            bool isBadNews = await CheckNews();
-            return isBadNews;
-        }
-
+        
         public void CheckLevels()
         {
             // Support/Resistance
