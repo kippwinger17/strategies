@@ -33,6 +33,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public class StandardDeev : Strategy
     {
+        public bool show_output = false;
+
         private double entry_price;
         private double stopLossPrice = 0.0;
         private double sl_price = 0.0;
@@ -92,6 +94,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         string currentDate;
 
         // News
+        public bool has_news_been_checked_today = false;
+        public DateTime date_news_was_last_checked = new DateTime();
         private DateTime lastNewsUpdate = DateTime.MinValue;
         private string lastLoadError;
         public bool Debug = false;
@@ -178,7 +182,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             "2024-07-02", // July dates
             "2024-07-11",
-            "2024-07-25"
+            "2024-07-25",
+
+            "2024-08-02",
+            "2024-08-05", // August
+            "2024-08-14",
+            "2024-08-15"
+
         };
 
         protected override void OnStateChange()
@@ -225,6 +235,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
+            // Get the date
+            DateTime todays_date = Time[0].Date;
+            //NinjaTrader.Code.Output.Process("Today " + todays_date.ToString(), PrintTo.OutputTab2);
+            
+            //if (date_news_was_last_checked == todays_date)
+            //    bad_news_day = false;
+
 
             if (Bars.IsFirstBarOfSession)
             {
@@ -232,7 +249,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 sessionIterator.GetNextSession(Time[0], true);
                 currentDate = sessionIterator.ActualSessionEnd.ToString("yyyy-MM-dd");
                 Print("Current Date: " + currentDate);
-                NinjaTrader.Code.Output.Process("The current session start time is " + sessionIterator.ActualSessionEnd.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("--==== Current session start time is " + sessionIterator.ActualSessionEnd.ToString() + " ====--", PrintTo.OutputTab2);
             }
 
             if (BarsInProgress != 0)
@@ -241,32 +258,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBars[0] < 1)
                 return;
 
-            //LoadNews();
-            CheckNews();
+            //bool isBadNews = await CheckNews();
+            if (date_news_was_last_checked != todays_date)
+            {
+                bad_news_day = GetEventsForWeek(todays_date);
+                NinjaTrader.Code.Output.Process("\tNews Checked on " + date_news_was_last_checked.ToString(), PrintTo.OutputTab2);
+                if (bad_news_day)
+                    NinjaTrader.Code.Output.Process("\tDON'T TRADE TODAY!!", PrintTo.OutputTab2);
+                else
+                    NinjaTrader.Code.Output.Process("\tWE TRADE TODAY!!", PrintTo.OutputTab2);
 
-            CheckLevels();
+                NinjaTrader.Code.Output.Process("\n--====  ====--\n", PrintTo.OutputTab2);
+            }
 
-            NinjaTrader.Code.Output.Process("------------------------CHECKS------------------------", PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Open: " + Open[0].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("High: " + High[0].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resTop1: " + resTop1.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resTop2: " + resTop2.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resTop3: " + resTop3.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resBotton1: " + resBotton1.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resBotton2: " + resBotton2.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resBotton3: " + resBotton3.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Close - entry_price: " + (Close[0] - entry_price).ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("------------------------END CHECKS------------------------", PrintTo.OutputTab2);
-
+                CheckLevels();
+            if (show_output)
+            {
+                NinjaTrader.Code.Output.Process("------------------------CHECKS------------------------", PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Open: " + Open[0].ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("High: " + High[0].ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resTop1: " + resTop1.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resTop2: " + resTop2.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resTop3: " + resTop3.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resBotton1: " + resBotton1.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resBotton2: " + resBotton2.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resBotton3: " + resBotton3.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Close - entry_price: " + (Close[0] - entry_price).ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("------------------------END CHECKS------------------------", PrintTo.OutputTab2);
+            }
             VwapCheck();
 
             getYourTradeOn();
@@ -275,163 +303,119 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         }
 
-
-        /*private void LoadNews()
+        public bool GetEventsForWeek(DateTime today)
         {
-
-            lastNewsUpdate = DateTime.Now;
-            lastLoadError = null;
+            string filePath = @"C:\Users\Jones\Documents\Stocks\News\news.xml";
+            string formattedDate = today.ToString("MM-dd-yyyy");
+            bool bday = false;
 
             try
             {
+                // Load the XML from a local file
+                XDocument doc = XDocument.Load(filePath);
 
-                if (Debug)
+                // Parse the XML and pull out the events where the date matches today's date
+                var eventsToday = doc.Descendants("event")
+                                     .Where(e => e.Element("date")?.Value.Trim() == formattedDate &&  // Date condition
+                                         e.Element("country")?.Value == "USD" &&  // Country condition
+                                         e.Element("impact")?.Value.Trim() == "High")  // Impact condition
+                                     .Select(e => new
+                                     {
+                                         Title = e.Element("title")?.Value,
+                                         Country = e.Element("country")?.Value,
+                                         Date = e.Element("date")?.Value,
+                                         Impact = e.Element("impact")?.Value
+                                     });
+
+                // Check if any events match today's date and print them out
+                foreach (var ev in eventsToday)
                 {
-                    Print("LoadNews()....");
-                    string[] patts = CultureInfo.CurrentCulture.DateTimeFormat.GetAllDateTimePatterns();
-                    Print("All DateTime Patterns for culture: " + CultureInfo.CurrentCulture.Name);
-                    foreach (string patt in patts)
+                    NinjaTrader.Code.Output.Process($"Title: {ev.Title}, Country: {ev.Country}, Date: {ev.Date}", PrintTo.OutputTab2);
+                    if (ev.Title.Contains("CPI ") ||
+                        ev.Title.Contains("Core Retail") ||
+                        ev.Title.Contains("Fed Chair ") ||
+                        ev.Title.Contains("Prelim UoM Consumer Sentiment") ||
+                        ev.Title.Contains("ISM Services PMI") ||
+                        ev.Title.Contains("Unemployment Claims"))
                     {
-                        Print("    " + patt);
+                        NinjaTrader.Code.Output.Process("Don't Trade Today! (" + formattedDate + ")", PrintTo.OutputTab2);
+                        date_news_was_last_checked = today;
+                        return true;
                     }
-                    Print("End of DateTime Patterns");
+
                 }
-
-
-                // add a random query string to defeat server side caching.
-                string urltweak = ffNewsUrl + "?x=" + Convert.ToString(DateTime.Now.Ticks);
-
-                if (Debug) Print("Loading news from URL: " + urltweak);
-
-                HttpWebRequest newsReq = (HttpWebRequest)HttpWebRequest.Create(urltweak);
-                newsReq.CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.Reload);
-
-                // fetch the xml doc from the web server
-
-                using (HttpWebResponse newsResp = (HttpWebResponse)newsReq.GetResponse())
-                {
-                    // check that we got a valid reponse
-                    if (newsResp != null && newsResp.StatusCode == HttpStatusCode.OK)
-                    {
-                        // read the response stream into and xml document
-                        Stream receiveStream = newsResp.GetResponseStream();
-                        Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
-                        StreamReader readStream = new StreamReader(receiveStream, encode);
-                        string xmlString = readStream.ReadToEnd();
-
-                        if (Debug) Print("RAW http response: " + xmlString);
-                        XmlDocument newsDoc = new XmlDocument();
-                        newsDoc.LoadXml(xmlString);
-
-                        if (Debug) Print("XML news event node count: " + newsDoc.DocumentElement.ChildNodes.Count);
-
-                        // build collection of events
-
-                        System.Collections.ArrayList list = new System.Collections.ArrayList();
-                        int itemId = 0;
-
-                        for (int i = 1; i < newsDoc.DocumentElement.ChildNodes.Count; i++)
-
-                        //	(XmlNode xmlNode in newsDoc.DocumentElement.ChildNodes)
-
-                        //	foreach(XmlNode xmlNode in newsDoc.DocumentElement.ChildNodes)
-                        {
-
-                            NewsEvent newsEvent = new NewsEvent();
-                            newsEvent.Time = newsDoc.DocumentElement.ChildNodes[i].SelectSingleNode("time").InnerText;
-                            if (string.IsNullOrEmpty(newsEvent.Time)) continue;  // ignore tentative events!
-                            newsEvent.Date = newsDoc.DocumentElement.ChildNodes[i].SelectSingleNode("date").InnerText;
-                            // assembly and convert event date/time to local time.
-                            if (Debug) Print(string.Format("About to parse Date '{0}', Time '{1}'", newsEvent.Date, newsEvent.Time));
-                            newsEvent.DateTimeLocal = DateTime.SpecifyKind(DateTime.Parse(newsEvent.Date + " " + newsEvent.Time, ffDateTimeCulture), DateTimeKind.Utc).ToLocalTime();
-                            if (Debug) Print("Succesfully parsed datetime: " + newsEvent.DateTimeLocal.ToString() + " to local time.");
-                            // filter events based on settings...
-                            DateTime startTime = DateTime.Now;
-                            DateTime endTime = startTime.AddDays(1);
-
-                            // filter news events based on various property settings...
-                            if (newsEvent.DateTimeLocal >= startTime && (!TodaysNewsOnly || newsEvent.DateTimeLocal.Date < endTime.Date))
-                            {
-                                newsEvent.ID = ++itemId;
-                                newsEvent.Country = newsDoc.DocumentElement.ChildNodes[i].SelectSingleNode("country").InnerText;
-                                if (USOnlyEvents && newsEvent.Country != "USD") continue;
-                                newsEvent.Forecast = newsDoc.DocumentElement.ChildNodes[i].SelectSingleNode("forecast").InnerText;
-                                newsEvent.Impact = newsDoc.DocumentElement.ChildNodes[i].SelectSingleNode("impact").InnerText;
-                                if (!ShowLowPriority && newsEvent.Impact.ToUpper() == "LOW") continue;
-                                newsEvent.Previous = newsDoc.DocumentElement.ChildNodes[i].SelectSingleNode("previous").InnerText;
-                                newsEvent.Title = newsDoc.DocumentElement.ChildNodes[i].SelectSingleNode("title").InnerText;
-                                list.Add(newsEvent);
-                                if (Debug) Print("Added: " + newsEvent.ToString());
-                                if (newsEvent.Impact == "High")
-                                    highTimes = true;
-
-                            }
-                        }
-
-                        newsEvents = (NewsEvent[])list.ToArray(typeof(NewsEvent));
-                        if (Debug) Print("Added a total of " + list.Count + " events to array.");
-                    }
-                    else
-                    {
-                        // handle unexpected scenarios...
-                        if (newsResp == null) throw new Exception("Web response was null.");
-                        else throw new Exception("Web response status code = " + newsResp.StatusCode.ToString());
-                    }
-                }
-
             }
             catch (Exception ex)
             {
-                Print("LoadNews error in jtEconNews2A" + ex.ToString());
-                Log("LoadNews error in jtEconNews2A" + ex.ToString(), LogLevel.Information);
-                lastLoadError = ex.Message;
+                Console.WriteLine($"Error fetching or processing the news: {ex.Message}");
             }
-        }*/
 
-        public async Task CheckNews()
+            date_news_was_last_checked = today;
+            return false;
+        }
+
+        public bool GetEventsForToday(DateTime today)
         {
-            DateTime tradingDate = Time[0].Date;
-            string formattedDate = tradingDate.ToString("MM-dd-yyyy");
-
-            //AVOID CPI DAYS & core retail sales & Prelim UoM Consumer Sentiment & Unemployment Claims
-            NinjaTrader.Code.Output.Process("Check the news (" + formattedDate.ToString() + ")", PrintTo.OutputTab2);
             string url = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml";
+            //DateTime today = Time[0].Date;
+            string formattedDate = today.ToString("MM-dd-yyyy");
 
             using (HttpClient client = new HttpClient())
             {
-                // Download the XML
-                string xmlContent = await client.GetStringAsync(url);
-
-                // Load the XML into an XDocument
-                XDocument doc = XDocument.Parse(xmlContent);
-
-                // Parse the XML and pull out the elements
-                var events = doc.Descendants("event")
-                                .Select(e => new
-                                {
-                                    Title = e.Element("title")?.Value,
-                                    Country = e.Element("country")?.Value,
-                                    Date = e.Element("date")?.Value
-                                });
-
-                // Output the results
-                foreach (var ev in events)
+                try
                 {
-                    //Console.WriteLine($"Title: {ev.Title}, Country: {ev.Country}, Date: {ev.Date}");
-                    if (ev.Country == "USD" && ev.Date == formattedDate)
+                    // Download the XML content synchronously
+                    string xmlContent = client.GetStringAsync(url).Result;
+
+                    // Load the XML into an XDocument
+                    XDocument doc = XDocument.Parse(xmlContent);
+
+                    // Parse the XML and pull out the events where the date matches today's date
+                    var eventsToday = doc.Descendants("event")
+                                         .Where(e => e.Element("date")?.Value == formattedDate)
+                                         .Select(e => new
+                                         {
+                                             Title = e.Element("title")?.Value,
+                                             Country = e.Element("country")?.Value,
+                                             Date = e.Element("date")?.Value,
+                                             Impact = e.Element("impact")?.Value
+                                         });
+
+                    // Output the results
+                    foreach (var ev in eventsToday)
                     {
-                        NinjaTrader.Code.Output.Process($"Title: {ev.Title}, Country: {ev.Country}, Date: {ev.Date}", PrintTo.OutputTab2);
-                        if (ev.Title.Contains("CPI ") || ev.Title.Contains("core retail") || ev.Title.Contains("Fed Chair ") ||
-                            ev.Title.Contains("Prelim UoM Consumer Sentiment")
-                            || ev.Title.Contains("Unemployment Claims"))
+                        if (ev.Country == "USD" && ev.Date == formattedDate && ev.Impact == "High")
                         {
-                            NinjaTrader.Code.Output.Process("Don't Trade Today! (" + formattedDate.ToString() + ")", PrintTo.OutputTab2);
-                            bad_news_day = true;
+                            NinjaTrader.Code.Output.Process($"Title: {ev.Title}, Country: {ev.Country}, Date: {ev.Date}", PrintTo.OutputTab2);
+                            if (ev.Title.Contains("CPI ") ||
+                                ev.Title.Contains("core retail") ||
+                                ev.Title.Contains("Fed Chair ") ||
+                                ev.Title.Contains("Prelim UoM Consumer Sentiment") ||
+                                ev.Title.Contains("ISM Services PMI") ||
+                                ev.Title.Contains("Unemployment Claims"))
+                            {
+                                NinjaTrader.Code.Output.Process("Don't Trade Today! (" + formattedDate + ")", PrintTo.OutputTab2);
+                                date_news_was_last_checked = today;
+                                return true;
+                            }
+
                         }
                     }
                 }
-            }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error fetching or processing the news: {ex.Message}");
+                }
 
+            }
+            date_news_was_last_checked = today;
+            return false;
+        }
+
+        public async Task<bool> SomeMethod()
+        {
+            bool isBadNews = await CheckNews();
+            return isBadNews;
         }
 
         public void CheckLevels()
@@ -478,8 +462,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             LowestLow = s.SupportPlot[0];
             highestHigh = s.ResistancePlot[0];
 
-            NinjaTrader.Code.Output.Process("Highest: " + s.ResistancePlot[0].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Lowest: " + s.SupportPlot[0].ToString(), PrintTo.OutputTab2);
+            //NinjaTrader.Code.Output.Process("Highest: " + s.ResistancePlot[0].ToString(), PrintTo.OutputTab2);
+            //NinjaTrader.Code.Output.Process("Lowest: " + s.SupportPlot[0].ToString(), PrintTo.OutputTab2);
         }
 
         public void VwapCheck()
@@ -532,39 +516,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // Longs
             // VWAP
-            NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Open: " + Open[0].ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("std_deviation_short_value1: " + std_deviation_short_value1.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("std_deviation_long_value2: " + std_deviation_long_value2.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("std_deviation_short_value2: " + std_deviation_short_value2.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resTop1: " + resTop1.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resTop2: " + resTop2.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resTop3: " + resTop3.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resBotton1: " + resBotton1.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resBotton2: " + resBotton2.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("resBotton3: " + resBotton3.ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("(Close[0] > EMA(55)[0]): " + (Close[0] > EMA(55)[0]).ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("TEMA(21)[0] > SMA(21)[0]: " + (TEMA(21)[0] > SMA(21)[0]).ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("(Close[1] < vwap_value): " + (Close[1] < vwap_value).ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("(Open[1] < vwap_value): " + (Open[1] < vwap_value).ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process("Close[0] > vwap_value: " + (Close[0] > vwap_value).ToString(), PrintTo.OutputTab2);
-            NinjaTrader.Code.Output.Process(" Open[0] > vwap_value: " + (Open[0] > vwap_value).ToString(), PrintTo.OutputTab2);
-
-            if (Close[0] > EMA(55)[0]
-                && TEMA(21)[0] > SMA(21)[0]
-                && vwap_value > EMA(55)[0]
-                && ((Close[1] < vwap_value || Open[1] < vwap_value)
-                    && (Close[0] > vwap_value && Open[0] > vwap_value))
-                )
+            if (show_output)
             {
-
                 NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
@@ -575,7 +528,41 @@ namespace NinjaTrader.NinjaScript.Strategies
                 NinjaTrader.Code.Output.Process("std_deviation_short_value1: " + std_deviation_short_value1.ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("std_deviation_long_value2: " + std_deviation_long_value2.ToString(), PrintTo.OutputTab2);
                 NinjaTrader.Code.Output.Process("std_deviation_short_value2: " + std_deviation_short_value2.ToString(), PrintTo.OutputTab2);
-
+                NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resTop1: " + resTop1.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resTop2: " + resTop2.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resTop3: " + resTop3.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resBotton1: " + resBotton1.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resBotton2: " + resBotton2.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("resBotton3: " + resBotton3.ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("\n", PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("(Close[0] > EMA(55)[0]): " + (Close[0] > EMA(55)[0]).ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("TEMA(21)[0] > SMA(21)[0]: " + (TEMA(21)[0] > SMA(21)[0]).ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("(Close[1] < vwap_value): " + (Close[1] < vwap_value).ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("(Open[1] < vwap_value): " + (Open[1] < vwap_value).ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process("Close[0] > vwap_value: " + (Close[0] > vwap_value).ToString(), PrintTo.OutputTab2);
+                NinjaTrader.Code.Output.Process(" Open[0] > vwap_value: " + (Open[0] > vwap_value).ToString(), PrintTo.OutputTab2);
+            }
+            if (Close[0] > EMA(55)[0]
+                && TEMA(21)[0] > SMA(21)[0]
+                && vwap_value > EMA(55)[0]
+                && ((Close[1] < vwap_value || Open[1] < vwap_value)
+                    && (Close[0] > vwap_value && Open[0] > vwap_value))
+                )
+            {
+                if (show_output)
+                {
+                    NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Open: " + Open[0].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_short_value1: " + std_deviation_short_value1.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_long_value2: " + std_deviation_long_value2.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_short_value2: " + std_deviation_short_value2.ToString(), PrintTo.OutputTab2);
+                }
 
                 EnterLong(4, "VWAP Cross Long");
                 vwap_long = true;
@@ -607,18 +594,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                     && (Close[0] > std_deviation_long_value1 && Open[0] > std_deviation_long_value1))
                 )
             {
-
-                NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("Open: " + Open[0].ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("std_deviation_short_value1: " + std_deviation_short_value1.ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("std_deviation_long_value2: " + std_deviation_long_value2.ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("std_deviation_short_value2: " + std_deviation_short_value2.ToString(), PrintTo.OutputTab2);
-
+                if (show_output)
+                {
+                    NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Open: " + Open[0].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_short_value1: " + std_deviation_short_value1.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_long_value2: " + std_deviation_long_value2.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_short_value2: " + std_deviation_short_value2.ToString(), PrintTo.OutputTab2);
+                }
 
                 //EnterLong(4, "Std1 Cross Long");
                 //std_dev_long_1 = true;
@@ -650,17 +638,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 )
             {
                 vwap_short = true;
-                NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("Open: " + Open[0].ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("std_deviation_short_value1: " + std_deviation_short_value1.ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("std_deviation_long_value2: " + std_deviation_long_value2.ToString(), PrintTo.OutputTab2);
-                NinjaTrader.Code.Output.Process("std_deviation_short_value2: " + std_deviation_short_value2.ToString(), PrintTo.OutputTab2);
-
+                if (show_output)
+                {
+                    NinjaTrader.Code.Output.Process("", PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Prev. Close: " + Close[1].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Prev. Open: " + Open[1].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Close: " + Close[0].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("Open: " + Open[0].ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("vwap_value: " + vwap_value.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_long_value1: " + std_deviation_long_value1.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_short_value1: " + std_deviation_short_value1.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_long_value2: " + std_deviation_long_value2.ToString(), PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process("std_deviation_short_value2: " + std_deviation_short_value2.ToString(), PrintTo.OutputTab2);
+                }
                 //EnterShort(1, "VWAP Cross Short");
                 //EnterLongStopLimit(std_deviation_long_value1, std_deviation_short_value2);
                 //stopLossPrice = Position.AveragePrice - 10 * TickSize;
