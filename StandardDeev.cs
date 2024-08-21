@@ -186,8 +186,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             "2024-08-02",
             "2024-08-05", // August
-            "2024-08-14",
-            "2024-08-15"
+            "2024-08-14"
 
         };
 
@@ -218,7 +217,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Default Times
                 StartTime = 50000;
-                EndTime = 110000;
+                EndTime = 105000;
 
                 Debug = false;
 
@@ -710,7 +709,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         vwap_short = false;
                     }
 
-                    // If we went under 29 ticks
+                    // If we went under 28 ticks
                     if (Close[0] < entry_price - 28)
                     {
                         ExitLong("VWAP Cross Long");
