@@ -304,7 +304,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         public bool GetEventsForWeek(DateTime today)
         {
-            string filePath = @"C:\Users\Jones\Documents\Stocks\News\news.xml";
+            DateTime current_day = DateTime.Today;
+            int daysSinceMonday = (int)current_day.DayOfWeek - (int)DayOfWeek.Monday;
+            if (daysSinceMonday < 0)
+            {
+                daysSinceMonday += 7; // Adjust for Sunday being treated as the start of the week
+            }
+            DateTime monday = today.AddDays(-daysSinceMonday);
+
+
+            string filePath = @"C:\Users\Jones\Documents\Stocks\News\this_week_" + monday.ToString("MM-dd-yyyy") + ".xml";
             string formattedDate = today.ToString("MM-dd-yyyy");
             bool bday = false;
 
