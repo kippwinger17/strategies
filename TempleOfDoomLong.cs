@@ -96,7 +96,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         public DateTime date_news_was_last_checked = new DateTime();
         private DateTime lastNewsUpdate = DateTime.MinValue;
         private string lastLoadError;
-        public bool Debug = false;
         private CultureInfo ffDateTimeCulture = CultureInfo.CreateSpecificCulture("en-US");
 
         public bool bad_news_day = false;
@@ -217,7 +216,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 StartTime = 50000;
                 EndTime = 105000;
 
-                Debug = false;
             }
 			else if (State == State.Configure)
 			{
