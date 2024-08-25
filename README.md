@@ -49,7 +49,6 @@
    - It is recommended to monitor this output to understand the strategy's decision-making process.
 
 ## Customization
-- **Debugging**: Set the `Debug` variable to `true` to enable detailed logging for troubleshooting.
 - **Time Settings**: Modify the `StartTime` and `EndTime` variables to change the active trading window.
 - **News Impact**: Update the logic in `GetEventsForWeek` and `GetEventsForToday` to add or remove conditions for avoiding trading on news days.
 
