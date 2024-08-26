@@ -183,7 +183,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             "2024-08-02",
             "2024-08-05", // August
-            "2024-08-14"
+            "2024-08-14",
+            "2024-08-15",
+            "2024-08-22",
+            "2024-08-23"
 
         };
 
@@ -214,7 +217,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Default Times
                 StartTime = 50000;
-                EndTime = 105000;
+                EndTime = 103800;
 
             }
 			else if (State == State.Configure)
@@ -478,7 +481,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 )
             {
                 
-                EnterLong(10, "VWAP Cross Long");
+                EnterLong(4, "VWAP Cross Long");
                 vwap_long = true;
                 double profit_target = std_deviation_long_value1;
                 entry_price = GetCurrentBid();
