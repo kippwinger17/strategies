@@ -278,6 +278,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             DateTime current_day = DateTime.Today;
             int daysSinceMonday = (int)current_day.DayOfWeek - (int)DayOfWeek.Monday;
+            daysSinceMonday = daysSinceMonday - 1;  // adjustment
             if (daysSinceMonday < 0)
             {
                 daysSinceMonday += 7; // Adjust for Sunday being treated as the start of the week
@@ -298,7 +299,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 var eventsToday = doc.Descendants("event")
                                      .Where(e => e.Element("date")?.Value.Trim() == formattedDate &&  // Date condition
                                          e.Element("country")?.Value == "USD" &&  // Country condition
-                                         e.Element("impact")?.Value.Trim() == "High")  // Impact condition
+                                         (e.Element("impact")?.Value.Trim() == "High" ||
+                                        e.Element("impact")?.Value.Trim() == "Medium"))
                                      .Select(e => new
                                      {
                                          Title = e.Element("title")?.Value,
@@ -310,7 +312,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Check if any events match today's date and print them out
                 foreach (var ev in eventsToday)
                 {
-                    NinjaTrader.Code.Output.Process($"Title: {ev.Title}, Country: {ev.Country}, Date: {ev.Date}", PrintTo.OutputTab2);
+                    NinjaTrader.Code.Output.Process($"Impact: {ev.Impact},Title: {ev.Title}, Country: {ev.Country}, Date: {ev.Date}", PrintTo.OutputTab2);
                     if (ev.Title.Contains("CPI ") ||
                         ev.Title.Contains("Core Retail") ||
                         ev.Title.Contains("Fed Chair ") ||
@@ -321,6 +323,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                         NinjaTrader.Code.Output.Process("Don't Trade Today! (" + formattedDate + ")", PrintTo.OutputTab2);
                         date_news_was_last_checked = today;
                         return true;
+                    }
+                    if (ev.Country == "USD" && ev.Date == formattedDate && ev.Impact == "Medium")
+                    {
+                        if (ev.Title.Contains("Crude Oil Inventories"))
+                        {
+                            NinjaTrader.Code.Output.Process("Don't Trade Today! (" + formattedDate + ")", PrintTo.OutputTab2);
+                            date_news_was_last_checked = today;
+                            return true;
+                        }
+
                     }
 
                 }
@@ -373,6 +385,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 ev.Title.Contains("Prelim UoM Consumer Sentiment") ||
                                 ev.Title.Contains("ISM Services PMI") ||
                                 ev.Title.Contains("Unemployment Claims"))
+                            {
+                                NinjaTrader.Code.Output.Process("Don't Trade Today! (" + formattedDate + ")", PrintTo.OutputTab2);
+                                date_news_was_last_checked = today;
+                                return true;
+                            }
+                        }
+                        else if (ev.Country == "USD" && ev.Date == formattedDate && ev.Impact == "Medium")
+                        {
+                            NinjaTrader.Code.Output.Process($"Title: {ev.Title}, Country: {ev.Country}, Date: {ev.Date}", PrintTo.OutputTab2);
+                            if (ev.Title.Contains("Crude Oil Inventories"))
                             {
                                 NinjaTrader.Code.Output.Process("Don't Trade Today! (" + formattedDate + ")", PrintTo.OutputTab2);
                                 date_news_was_last_checked = today;
